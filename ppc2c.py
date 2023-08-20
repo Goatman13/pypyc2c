@@ -795,17 +795,7 @@ def PPCAsm2C(ea):
 
 	return 0
 
-	
-def PluginMain():
-	
-	# select current line or selected lines
-	always_insert_comment = False
-	start_addr = read_selection_start()
-	end_addr = read_selection_end()
-	if(start_addr == BADADDR):
-		start_addr = get_screen_ea();
-		end_addr = start_addr + 4;
-		always_insert_comment = True
+def run_task(start_addr, end_addr, always_insert_comment):
 
 	# convert all instructions within the bounds
 	addr = start_addr
@@ -816,6 +806,33 @@ def PluginMain():
 		elif (always_insert_comment == True):
 			msg("0x{:X}: Error converting PPC to C code\n".format(addr))
 		addr += 4
+
+def PluginMain():
+	
+	# select current line or selected lines
+	always_insert_comment = False
+	start_addr = read_selection_start()
+	end_addr = read_selection_end()
+	if(start_addr == BADADDR):
+		start_addr = get_screen_ea();
+		end_addr = start_addr + 4;
+		always_insert_comment = True
+	
+	run_task(start_addr, end_addr, always_insert_comment)
+
+
+def PluginMainF():
+	
+	# convert current function
+	p_func = get_func(get_screen_ea());
+	if(p_func == None):
+		msg("Not in a function, so can't do PPC to C conversion for the current function!\n");
+		return;
+	start_addr = p_func.start_ea;
+	end_addr = p_func.end_ea;
+	always_insert_comment = False;
+	
+	run_task(start_addr, end_addr, always_insert_comment)
 
 
 #/***************************************************************************************************
@@ -834,9 +851,7 @@ G_PLUGIN_NAME = "PPC To C: Selected Lines"
 #*
 #***************************************************************************************************/
 
-def start_plg1():
-	
-	print("pypyc2c: Unimplemented.")
+
 
 class ActionHandler(idaapi.action_handler_t):
 
@@ -868,9 +883,9 @@ def register_actions():
         {
             'id': 'start:plg1',
             'name': 'pypyc2c unimplemented',
-            'hotkey': 'Alt-Shift-5',
+            'hotkey': 'Alt-Shift-F10',
             'comment': G_PLUGIN_COMMENT,
-            'callback': start_plg1,
+            'callback': PluginMainF,
             'menu_location': 'Start Plg1'
         }
     ]
