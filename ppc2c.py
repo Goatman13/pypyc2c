@@ -566,7 +566,6 @@ def slwi(ea, g_mnem, g_RA, g_RS, n):
 	g_MB = 0
 	g_ME = 31-n
 
-	# fix the mask values because no mask is required when doing "slwi"
 	return iRotate_iMask32(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
 
@@ -579,7 +578,6 @@ def srwi(ea, g_mnem, g_RA, g_RS, n):
 	g_MB = n
 	g_ME = 31
 
-	# fix the mask values because no mask is required when doing "slwi"
 	return iRotate_iMask32(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
 
@@ -673,23 +671,31 @@ def PPCAsm2C(ea):
 		return False
 
 	# get instruction mnemonic
-	g_mnem = ida_ua.ua_mnem(ea)
+	g_mnem = print_insn_mnem(ea)
 	if(g_mnem == 0):
 		return False
-	#tag_remove(g_mnem, g_mnem, sizeof(g_mnem))
+	
+	is_ok = False
+	accepted = ["clrlwi", "clrldi", "clrrwi", "clrrdi", "clrlslwi", "clrlsldi",
+				"extlwi", "extldi", "extrwi", "extrdi", "inslwi", "insrwi", "insrdi",
+				"rlwinm", "rlwnm", "rotlw", "rotlwi", "rotrwi", "slwi", "srwi", "sldi",
+				"srdi", "rldcr", "rldic", "rldicl", "rldicr", "rldimi", "rlwimi"]
+	for x in accepted:
+		if (g_mnem == x):
+			is_ok = True
+			break
+	if (is_ok == False):
+		return False
+	
+	#Remove rc bit if exist - todo
 	#char* ptr = (char*)qstrstr(g_mnem, ".")
 	#if(ptr) *ptr = 0
 
 	# get instruction operand strings
 	# IDA only natively supports 3 operands
 	g_opnd_s0 = print_operand(ea, 0)
-	#tag_remove(g_opnd_s0, g_opnd_s0, sizeof(g_opnd_s0))
-
 	g_opnd_s1 = print_operand(ea, 1)
-	#tag_remove(g_opnd_s1, g_opnd_s1, sizeof(g_opnd_s1))
-
 	g_opnd_s2 = print_operand(ea, 2)
-	#tag_remove(g_opnd_s2, g_opnd_s2, sizeof(g_opnd_s2))
 
 	# use some string manipulation to extract additional operands
 	# when more than 3 operands are used
@@ -724,11 +730,11 @@ def PPCAsm2C(ea):
 		return clrldi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
 	elif(g_mnem == "clrrwi"):
 		return clrrwi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
-	elif(g_mnem == "clrrdi"): #new
+	elif(g_mnem == "clrrdi"):
 		return clrrdi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
 	elif(g_mnem == "clrlslwi"):
 		return clrlslwi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
-	elif(g_mnem == "clrlsldi"): #new
+	elif(g_mnem == "clrlsldi"):
 		return clrlsldi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
 	
 	# extract
@@ -768,9 +774,9 @@ def PPCAsm2C(ea):
 		return slwi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
 	elif(g_mnem == "srwi"):
 		return srwi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
-	elif(g_mnem == "sldi"): #new
+	elif(g_mnem == "sldi"):
 		return sldi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
-	elif(g_mnem == "srdi"): #new
+	elif(g_mnem == "srdi"):
 		return srdi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
 		
 	# 64bit versions of the above
@@ -784,87 +790,32 @@ def PPCAsm2C(ea):
 		return rldicr(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
 	elif(g_mnem == "rldimi"):
 		return rldimi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
-	elif(g_mnem == "rlwimi"): # Warning! s4 can not exist
+	elif(g_mnem == "rlwimi"):
 		return rlwimi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3, g_opnd_s4)
 
 	return 0
 
-
+	
 def PluginMain():
 	
-	# get the bounds for conversion
-	#bool always_insert_comment
-	#ea_t start_addr, end_addr
-	start_addr = get_screen_ea()
-	end_addr = start_addr + 4
-	always_insert_comment = True
-	#if(param == 0)
-	#{
-	#	# convert current line or selected lines
-	#	if( read_selection(&start_addr, &end_addr) )
-	#	#		# convert selected text
-	#		always_insert_comment = false
-	#	#	else
-	#	#		# convert single line
-	#		start_addr = get_screen_ea()
-	#		end_addr = start_addr + 4
-	#		always_insert_comment = true
-	#	#}
-	#elif(param == 1)
-	#{
-	#	# convert current function
-	#	func_t* p_func = get_func(get_screen_ea())
-	#	if(p_func == NULL)
-	#	#		msg("Not in a function, so can't do PPC to C conversion for the current function!\n")
-	#		return
-	#	#	start_addr = p_func->startEA
-	#	end_addr = p_func->endEA
-	#	always_insert_comment = false
-	#}
-	#else
-	#{
-	#	msg("Unknown mode - Please set the mode of execution in the plugins.cfg file\n")
-	#	return
-	#}
-	addr = start_addr
-	print_str = PPCAsm2C(addr)
-	if (print_str != 0):
-		
-		set_cmt(addr, print_str, False)
-		
-		# conversion was successful
-		# but if the result is an empty string we may not want to display it
-		#if( strlen(c_code_str) > 0 or always_insert_comment)
-		#{
-		#	# insert the C code as a comment
-		#	set_cmt(addr, c_code_str, false)
-		#}
-	else:
-		msg("0x{:X}: Error converting PPC to C code\n".format(addr))
+	# select current line or selected lines
+	always_insert_comment = False
+	start_addr = read_selection_start()
+	end_addr = read_selection_end()
+	if(start_addr == BADADDR):
+		start_addr = get_screen_ea();
+		end_addr = start_addr + 4;
+		always_insert_comment = True
+
 	# convert all instructions within the bounds
-	#char c_code_str[1024]
-	#for(ea_t addr=start_addr addr<end_addr addr+=4)
-	#{
-	#	print_str = PPCAsm2C(addr)
-	#	if( print_str
-	#	#		
-	#		set_cmt(addr, print_str, false)
-	#		
-	#		# conversion was successful
-	#		# but if the result is an empty string we may not want to display it
-	#		#if( strlen(c_code_str) > 0 or always_insert_comment)
-	#		#{
-	#		#	# insert the C code as a comment
-	#		#	set_cmt(addr, c_code_str, false)
-	#		#}
-	#	#	else
-	#	#		msg("%x: Error converting PPC to C code\n", addr)
-	#	#}
-	#
-	# analyse area to refresh any changes
-	#analyze_area(start_addr, end_addr)
-
-
+	addr = start_addr
+	while(addr < end_addr):
+		print_str = PPCAsm2C(addr)
+		if(print_str != 0):
+			set_cmt(addr, print_str, False)
+		elif (always_insert_comment == True):
+			msg("0x{:X}: Error converting PPC to C code\n".format(addr))
+		addr += 4
 
 
 #/***************************************************************************************************
@@ -875,7 +826,7 @@ def PluginMain():
 #
 G_PLUGIN_COMMENT = "PPC To C Conversion Assist"
 G_PLUGIN_HELP = "This plugin assists in converting PPC instructions into their relevant C code.\nIt is especially useful for the tricky bit manipulation and shift instructions.\n"
-G_PLUGIN_NAME = "PPC To C: Selected Line"
+G_PLUGIN_NAME = "PPC To C: Selected Lines"
 
 #/***************************************************************************************************
 #*
