@@ -517,7 +517,7 @@ def insrdi(ea, g_mnem, g_RA, g_RS, n, b):
 	# n how many bits, b staring from
 	g_SH = 64-(b+n)
 	g_MB = b
-	g_ME = ~n
+	g_ME = b+n-1
 
 	return insert_iRotate_iMask64(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
