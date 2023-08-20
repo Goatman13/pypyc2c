@@ -1,6 +1,28 @@
 # pypyc2c
 PowerPC to C plugin for IDA converted to python.
 
+Changes
+-------
+
+- Ported to ida python 3.
+- Fixed extrdi mask.
+- Added clrrdi, clrsldi, sldi, srdi.
+- Shifts print mask again.
+- Removed BC opcodes, ida handle them fine nowdays.
+- More minor changes here and there.
+
+To scan single opcode push F10.
+To scan multiple opcodes, mark them with mouse, and push F10.
+To scan whole function, select any address inside function and press ALT + SHIFT + F10.
+
+Not working after conversion
+----------------------------
+
+- Insrdi.
+- Always use bracelets for now. For eg. instead of r31 = r10 & 2 comment will be r31 = (r10) & 2.
+- Probably more, it was really fast translation to python code...
+
+
 PPC 2 C Plugin
 ==============
 Modified version of Zak Stanborough's PPC2C plugin released as part of [Hex-Rays Plug-In Contest 2009](https://www.hex-rays.com/contests/2009/).
