@@ -191,9 +191,12 @@ def iRotate_iMask32(ea, g_mnem, g_RA, g_RS, leftRotate, mb, me):
 		mask_str = "{:X}".format(mask)
 	else:
 		mask_str = "0x{:X}".format(mask)
-		
-	# generate the resultant string
-	ret_str = g_RA + " = " + "(" + rot_str + ") & " + mask_str
+	
+	# no bracelets
+	if (rot_str == g_RS):
+		ret_str = g_RA + " = " + rot_str + " & " + mask_str
+	else:
+		ret_str = g_RA + " = " + "(" + rot_str + ") & " + mask_str
 	return ret_str
 
 
@@ -236,7 +239,12 @@ def insert_iRotate_iMask32(ea, g_mnem, g_RA, g_RS, leftRotate, mb, me):
 	#	
 	# generate the resultant string
 	#"%s = (%s & ~%s) | (%s & %s)"
-	ret_str = g_RA + " = (" + g_RA + " & ~" + mask_str + ") | (" + rot_str + " & " + mask_str + ")"
+	
+	# no bracelets
+	if (rot_str == g_RS):
+		ret_str = g_RA + " = (" + g_RA + " & ~" + mask_str + ") | (" + rot_str + " & " + mask_str + ")"
+	else:
+		ret_str = g_RA + " = (" + g_RA + " & ~" + mask_str + ") | ((" + rot_str + ") & " + mask_str + ")"
 	return ret_str
 
 
@@ -299,8 +307,11 @@ def iRotate_iMask64(ea, g_mnem, g_RA, g_RS, leftRotate, mb, me):
 	else:
 		mask_str = "0x{:X}".format( mask)
 
-	# generate the resultant string
-	ret_str = g_RA + " = " + "(" + rot_str + ") & " + mask_str
+	# no bracelets
+	if (rot_str == g_RS):
+		ret_str = g_RA + " = " + rot_str + " & " + mask_str
+	else:
+		ret_str = g_RA + " = " + "(" + rot_str + ") & " + mask_str
 	return ret_str
 
 
@@ -343,7 +354,12 @@ def insert_iRotate_iMask64(ea, g_mnem, g_RA, g_RS, leftRotate, mb, me):
 		
 	# generate the resultant string
 	#"%s = (%s & ~%s) | (%s & %s)"
-	ret_str = g_RA + " = (" + g_RA + " & ~" + mask_str + ") | (" + rot_str + " & " + mask_str + ")"
+	
+	# no bracelets
+	if (rot_str == g_RS):
+		ret_str = g_RA + " = (" + g_RA + " & ~" + mask_str + ") | (" + rot_str + " & " + mask_str + ")"
+	else:
+		ret_str = g_RA + " = (" + g_RA + " & ~" + mask_str + ") | ((" + rot_str + ") & " + mask_str + ")"
 	return ret_str
 
 
@@ -795,6 +811,7 @@ def PPCAsm2C(ea):
 
 	return 0
 
+
 def run_task(start_addr, end_addr, always_insert_comment):
 
 	# convert all instructions within the bounds
@@ -806,6 +823,7 @@ def run_task(start_addr, end_addr, always_insert_comment):
 		elif (always_insert_comment == True):
 			msg("0x{:X}: Error converting PPC to C code\n".format(addr))
 		addr += 4
+
 
 def PluginMain():
 	
@@ -851,8 +869,6 @@ G_PLUGIN_NAME = "PPC To C: Selected Lines"
 #*
 #***************************************************************************************************/
 
-
-
 class ActionHandler(idaapi.action_handler_t):
 
     def __init__(self, callback):
@@ -889,7 +905,6 @@ def register_actions():
             'menu_location': 'Start Plg1'
         }
     ]
-
 
     for action in actions:
 

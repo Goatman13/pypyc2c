@@ -19,8 +19,7 @@ Not working after conversion
 ----------------------------
 
 - Insrdi.
-- Always use bracelets for now. For eg. instead of r31 = r10 & 2 comment will be r31 = (r10) & 2.
-- Probably more, it was really fast translation to python code...
+- Maybe more, it was really fast translation to python code...
 
 
 PPC 2 C Plugin
