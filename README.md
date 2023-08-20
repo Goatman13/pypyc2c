@@ -7,7 +7,7 @@ Changes
 
 - Ported to ida python 3.
 - Fixed extrdi mask.
-- Added clrrdi, clrsldi, sldi, srdi.
+- Added clrrdi, clrlsldi, sldi, srdi, rotldi, rotrdi.
 - Shifts print mask again.
 - Removed BC opcodes, ida handle them fine nowdays.
 - More minor changes here and there.

@@ -562,6 +562,30 @@ def rotrwi(ea, g_mnem, g_RA, g_RS, n):
 	return iRotate_iMask32(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
 
+def rotldi(ea, g_mnem, g_RA, g_RS, n):
+	
+	# Rotate left immediate
+	# rotldi RA, RS, n
+	# rldicl RA, RS, n, 0
+	g_SH = n
+	g_MB = 0
+	g_ME = 63
+
+	return iRotate_iMask64(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
+
+
+def rotrdi(ea, g_mnem, g_RA, g_RS, n):
+	
+	# Rotate right immediate
+	# rotrdi RA, RS, n
+	# rldicl RA, RS, 64 - n, 0
+	g_SH = 64-n
+	g_MB = 0
+	g_ME = 63
+
+	return iRotate_iMask64(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
+
+
 def rotlw(ea, g_mnem, g_RA, g_RS, g_RB):
 	
 	# Rotate left
@@ -694,7 +718,7 @@ def PPCAsm2C(ea):
 	is_ok = False
 	accepted = ["clrlwi", "clrldi", "clrrwi", "clrrdi", "clrlslwi", "clrlsldi",
 				"extlwi", "extldi", "extrwi", "extrdi", "inslwi", "insrwi", "insrdi",
-				"rlwinm", "rlwnm", "rotlw", "rotlwi", "rotrwi", "slwi", "srwi", "sldi",
+				"rlwinm", "rlwnm", "rotlw", "rotlwi", "rotrwi", "rotldi", "rotrdi", "slwi", "srwi", "sldi",
 				"srdi", "rldcr", "rldic", "rldicl", "rldicr", "rldimi", "rlwimi"]
 	for x in accepted:
 		if (g_mnem == x):
@@ -784,6 +808,10 @@ def PPCAsm2C(ea):
 		return rotlwi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
 	elif(g_mnem == "rotrwi"):
 		return rotrwi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
+	elif(g_mnem == "rotldi"):
+		return rotldi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
+	elif(g_mnem == "rotrdi"):
+		return rotrdi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
 		
 	# shift
 	elif(g_mnem == "slwi"):
