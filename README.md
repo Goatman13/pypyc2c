@@ -7,14 +7,14 @@ Changes
 
 - Ported to ida python 3.
 - Fixed extrdi mask.
-- Added clrrdi, clrlsldi, sldi, srdi, rotldi, rotrdi.
+- Added clrrdi, clrlsldi, extldi, sldi, srdi, rotldi, rotrdi.
 - Shifts print mask again.
 - Removed BC opcodes, ida handle them fine nowdays.
 - More minor changes here and there.
 
-To scan single opcode push F10.
-To scan multiple opcodes, mark them with mouse, and push F10.
-To scan whole function, select any address inside function and press ALT + SHIFT + F10.
+- To scan single opcode push F10.
+- To scan multiple opcodes, mark them with mouse, and push F10.
+- To scan whole function, select any address inside function and press ALT + SHIFT + F10.
 
 Examples
 --------

@@ -1,9 +1,7 @@
-#
 # PPC To C
 #
 # by working with the disassembled text this plugin should
 # work with both big and little endian PPC.
-#
 
 from ida_bytes import *
 from idaapi import *
@@ -149,7 +147,6 @@ def Rotate_iMask32(ea, g_mnem, g_RA, g_RS, leftRotate, mb, me):
 	rot_str = 0
 	rot_str = g_RS + " << " + leftRotate + " | " + g_RS + " >> 32 - " + leftRotate
 	if(mask == MASK32_ALLSET):
-		#qsnprintf(buff, buffSize, "%s = (u32)(%s)", g_RA, rot_str)
 		ret_str = g_RA + " = " + rot_str
 		return ret_str
 
@@ -230,23 +227,12 @@ def insert_iRotate_iMask32(ea, g_mnem, g_RA, g_RS, leftRotate, mb, me):
 	else:
 		mask_str = "0x{:X}".format( mask)
 	
-	#not_mask = ~mask
-	## generate not_mask string
-	#if (mask < 10):
-	#	not_mask_str.format("{:X}", not_mask)
-	#else:
-	#	not_mask_str.format("0x{:X}", not_mask)
-	#	
-	# generate the resultant string
-	#"%s = (%s & ~%s) | (%s & %s)"
-	
 	# no bracelets
 	if (rot_str == g_RS):
 		ret_str = g_RA + " = (" + g_RA + " & ~" + mask_str + ") | (" + rot_str + " & " + mask_str + ")"
 	else:
 		ret_str = g_RA + " = (" + g_RA + " & ~" + mask_str + ") | ((" + rot_str + ") & " + mask_str + ")"
 	return ret_str
-
 
 
 # register rotate and immediate mask
@@ -345,16 +331,6 @@ def insert_iRotate_iMask64(ea, g_mnem, g_RA, g_RS, leftRotate, mb, me):
 	else:
 		mask_str = "0x{:X}".format(mask)
 	
-	#not_mask = ~mask
-	## generate not_mask string
-	#if (mask < 10):
-	#	not_mask_str = "{:X}".format(not_mask)
-	#else:
-	#	not_mask_str  = "0x{:X}".format(not_mask)
-		
-	# generate the resultant string
-	#"%s = (%s & ~%s) | (%s & %s)"
-	
 	# no bracelets
 	if (rot_str == g_RS):
 		ret_str = g_RA + " = (" + g_RA + " & ~" + mask_str + ") | (" + rot_str + " & " + mask_str + ")"
@@ -374,7 +350,7 @@ def clrlwi(ea, g_mnem, g_RA, g_RS, n):
 	
 	# Clear left immediate
 	# clrlwi RA, RS, n
-	# (rlwinm RA, RS, 0, n, 31)
+	# rlwinm RA, RS, 0, n, 31
 	g_SH = 0
 	g_MB = n
 	g_ME = 31
@@ -385,7 +361,8 @@ def clrlwi(ea, g_mnem, g_RA, g_RS, n):
 def clrldi(ea, g_mnem, g_RA, g_RS, n):
 	
 	# Rotate Left Double Word Immediate then Clear Left
-	# rldicl RA, RS, SH, MB
+	# clrldi RA, RS, n
+	# rldicl RA, RS, 0, n
 	g_SH = 0
 	g_MB = n
 	g_ME = 63
@@ -397,7 +374,7 @@ def clrrwi(ea, g_mnem, g_RA, g_RS, n):
 	
 	# Clear right immediate
 	# clrrwi RA, RS, n
-	# (rlwinm RA, RS, 0, 0, 31-n)
+	# rlwinm RA, RS, 0, 0, 31-n
 	g_SH = 0
 	g_MB = 0
 	g_ME = 31-n
@@ -409,7 +386,7 @@ def clrrdi(ea, g_mnem, g_RA, g_RS, n):
 	
 	# Clear right immediate
 	# clrrdi RA, RS, n
-	# (rlwinm RA, RS, 0, 0, 31-n)
+	# rldicr RA, RS, 0, 63 - n
 	g_SH = 0
 	g_MB = 0
 	g_ME = 63-n
@@ -419,8 +396,9 @@ def clrrdi(ea, g_mnem, g_RA, g_RS, n):
 
 def clrlslwi(ea, g_mnem, g_RA, g_RS, b, n):
 	
+	# Clear left word and shift left immediate
 	# clrlslwi RA, RS, b, n
-	# (rlwinm RA, RS, b-n, 31-n)
+	# rlwinm RA, RS, b-n, 31-n
 	g_SH = n
 	g_MB = b-n
 	g_ME = 31-n
@@ -430,8 +408,9 @@ def clrlslwi(ea, g_mnem, g_RA, g_RS, b, n):
 
 def clrlsldi(ea, g_mnem, g_RA, g_RS, b, n):
 	
+	# Clear left double word and shift left immediate
 	# clrlsldi RA, RS, b, n
-	# (rlwinm RA, RS, b-n, 31-n)
+	# rldic RA, RS, n, b - n
 	g_SH = n
 	g_MB = b-n
 	g_ME = 63-n
@@ -453,8 +432,9 @@ def extrwi(ea, g_mnem, g_RA, g_RS, n, b):
 
 def extrdi(ea, g_mnem, g_RA, g_RS, n ,b):
 	
-	# Rotate Left Double Word Immediate then Clear Left
-	# rldicl RA, RS, SH, MB
+	# Extract double word and right justify immediate
+	# extrdi RA, RS, n, b
+	# rldicl RA, RS, b + n, 64 - n
 	g_SH = b+n
 	g_MB = 64-n
 	g_ME = 63
@@ -476,9 +456,9 @@ def extlwi(ea, g_mnem, g_RA, g_RS, n, b):
 
 def extldi(ea, g_mnem, g_RA, g_RS, n, b):
 	
-	# Extract and left justify immediate
+	# Extract double word and left justify immediate
 	# extldi RA, RS, n, b
-	# rlwinm RA, RS, b, 0, n-1
+	# rldicr RA, RS, b, n - 1
 	g_SH = b
 	g_MB = 0
 	g_ME = n-1
@@ -512,9 +492,9 @@ def insrwi(ea, g_mnem, g_RA, g_RS, n, b):
 
 def insrdi(ea, g_mnem, g_RA, g_RS, n, b):
 	
-	# Rotate Left Double Word Immediate then Mask Insert
-	# rldimi RA, RS, SH, MB
-	# n how many bits, b staring from
+	# Insert double word from right immediate
+	# insrdi RA, RS, n, b
+	# rldimi RA, RS, 64 - (b + n), b
 	g_SH = 64-(b+n)
 	g_MB = b
 	g_ME = b+n-1
@@ -623,9 +603,9 @@ def srwi(ea, g_mnem, g_RA, g_RS, n):
 
 def sldi(ea, g_mnem, g_RA, g_RS, n):
 	
-	# Shift left immediate
+	# Shift left double word immediate
 	# sldi RA, RS, n
-	# rlwinm RA, RS, n, 0, 31-n
+	# rldicr RA, RS, n, 63 - n
 	g_SH = n
 	g_MB = 0
 	g_ME = 63-n
@@ -635,9 +615,9 @@ def sldi(ea, g_mnem, g_RA, g_RS, n):
 
 def srdi(ea, g_mnem, g_RA, g_RS, n):
 	
-	# Shift right immediate
+	# Shift right double word immediate
 	# srdi RA, RS, n
-	# rlwinm RA, RS, 32-n, n, 31
+	# rldicl RA, RS, 64 - n, n
 	g_SH = 64-n
 	g_MB = n
 	g_ME = 63
@@ -715,6 +695,13 @@ def PPCAsm2C(ea):
 	if(g_mnem == 0):
 		return False
 	
+	# Remove record bit if exist,
+	# we need to do this before testing for opcode validity.
+	dot = "."
+	dot = g_mnem.find(dot)
+	if(dot != -1):
+		g_mnem = g_mnem[0:dot]
+	
 	is_ok = False
 	accepted = ["clrlwi", "clrldi", "clrrwi", "clrrdi", "clrlslwi", "clrlsldi",
 				"extlwi", "extldi", "extrwi", "extrdi", "inslwi", "insrwi", "insrdi",
@@ -726,10 +713,6 @@ def PPCAsm2C(ea):
 			break
 	if (is_ok == False):
 		return False
-	
-	#Remove rc bit if exist - todo
-	#char* ptr = (char*)qstrstr(g_mnem, ".")
-	#if(ptr) *ptr = 0
 
 	# get instruction operand strings
 	# IDA only natively supports 3 operands
@@ -794,6 +777,12 @@ def PPCAsm2C(ea):
 		return insrwi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
 	elif(g_mnem == "insrdi"):
 		return insrdi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
+
+	# rotate and insert
+	elif(g_mnem == "rlwimi"):
+		return rlwimi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3, g_opnd_s4)
+	elif(g_mnem == "rldimi"):
+		return rldimi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
 	
 	# rotate and mask
 	elif(g_mnem == "rlwinm"):
@@ -801,7 +790,17 @@ def PPCAsm2C(ea):
 	elif(g_mnem == "rlwnm"):
 		return rlwnm(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3, g_opnd_s4)
 	
-	# rotate - todo: 64 bit
+	# rotate and clear
+	elif(g_mnem == "rldcr"):
+		return rldcr(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
+	elif(g_mnem == "rldic"):
+		return rldic(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
+	elif(g_mnem == "rldicl"):
+		return rldicl(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
+	elif(g_mnem == "rldicr"):
+		return rldicr(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
+
+	# rotate
 	elif(g_mnem == "rotlw"):
 		return rotlw(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
 	elif(g_mnem == "rotlwi"):
@@ -823,20 +822,6 @@ def PPCAsm2C(ea):
 	elif(g_mnem == "srdi"):
 		return srdi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
 		
-	# 64bit versions of the above
-	elif(g_mnem == "rldcr"):
-		return rldcr(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
-	elif(g_mnem == "rldic"):
-		return rldic(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
-	elif(g_mnem == "rldicl"):
-		return rldicl(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
-	elif(g_mnem == "rldicr"):
-		return rldicr(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
-	elif(g_mnem == "rldimi"):
-		return rldimi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3)
-	elif(g_mnem == "rlwimi"):
-		return rlwimi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2, g_opnd_s3, g_opnd_s4)
-
 	return 0
 
 
