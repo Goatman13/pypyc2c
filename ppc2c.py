@@ -10,8 +10,9 @@ import idaapi
 import ida_bytes
 import idc
 
-MASK32_ALLSET = 0xFFFFFFFF
-MASK64_ALLSET = 0xFFFFFFFFFFFFFFFF
+RESOLVE_ANDNOT  = 1
+MASK32_ALLSET   = 0xFFFFFFFF
+MASK64_ALLSET   = 0xFFFFFFFFFFFFFFFF
 
 g_mnem = 0
 g_opnd_s0 = 0
@@ -81,7 +82,6 @@ def GenerateMask64(MB, ME):
 
 
 # generate string showing rotation or shifting within instruction
-# returns:	true if string requires brackets if a mask is used, ie: (r4 << 2) & 0xFF
 def GenerateRotate32(src, leftShift, rightShift, mask):
 	
 	ret_str = 0
@@ -106,7 +106,6 @@ def GenerateRotate32(src, leftShift, rightShift, mask):
 
 
 # generate string showing rotation or shifting within instruction
-# returns:	true if string requires brackets if a mask is used, ie: (r4 << 2) & 0xFF
 def GenerateRotate64(src, leftShift, rightShift, mask):
 	
 	# work out "rotate" part of the instruction
@@ -502,11 +501,51 @@ def insrdi(ea, g_mnem, g_RA, g_RS, n, b):
 	return insert_iRotate_iMask64(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
 
+def rlwinm_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
+
+	if (RESOLVE_ANDNOT == 0):
+		return 0
+
+	mask = GenerateMask32(g_MB, g_ME)
+	mask = ((mask >> g_SH) | (mask << (32-g_SH))) & 0xFFFFFFFF
+	mask = ~mask & 0xFFFFFFFF
+
+	# Find matching rotxwi
+	rotea = ea + 4
+	while(rotea < ea + 0x20):
+
+		# Remove record bit if exist
+		is_rotxwi = print_insn_mnem(rotea)[:6]
+		
+		if(is_rotxwi == "rotlwi" or is_rotxwi == "rotrwi"):
+			g_opnd_t0 = print_operand(rotea, 0)
+			g_opnd_t1 = print_operand(rotea, 1)
+			
+			# check if rotate is using result from rlwinm
+			if (g_opnd_t1 == g_RA):
+				rlwinm_comment = "AND NOT when paired with " + is_rotxwi + " at 0x{:X}".format(rotea)
+				rotxwi_comment = g_opnd_t0 + " = " + g_RS + " & ~0x{:X} (".format(mask) + g_RS + " from 0x{:X})".format(ea)
+				set_cmt(rotea, rotxwi_comment, 0)
+				set_cmt(ea   , rlwinm_comment, 0)
+				return 1
+
+		rotea += 4
+	
+	# rotxwi not found, fallback to default handling.
+	return 0
+
+
 def rlwinm(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 	
 	# Rotate Left Word Immediate Then AND with Mask
 	# rlwinm RA, RS, SH, MB, ME
+	
+	# Special case for rlwinm + rotxwi pairs
+	if(g_ME == 31 and g_SH != 0 and RESOLVE_ANDNOT):
+		if (rlwinm_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME) == 1):
+			return 1
 
+	# Default handling
 	return iRotate_iMask32(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
 
@@ -518,6 +557,31 @@ def rlwnm(ea, g_mnem, g_RA, g_RS, g_RB, g_MB, g_ME):
 	return Rotate_iMask32(ea, g_mnem, g_RA, g_RS, g_RB, g_MB, g_ME)
 
 
+def rotxwi_andnot(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2):
+	
+	if (RESOLVE_ANDNOT == 0):
+		return 0
+
+	# Find matching rlwinm
+	rlwea = ea - 4
+	while(rlwea > ea - 0x20):
+	
+		# Remove record bit if exist
+		is_rlwinm = print_insn_mnem(rlwea)[:6]
+		
+		if(is_rlwinm == "rlwinm"):
+			g_opnd_t0 = print_operand(rlwea, 0)
+			g_opnd_t1 = print_operand(rlwea, 1)
+			g_opnd_t2 = print_operand(rlwea, 2)
+			
+			if(g_opnd_t0 == g_opnd_s1):
+				return PPCAsm2C(rlwea)
+
+		rlwea -= 4
+		
+	return 0
+
+
 def rotlwi(ea, g_mnem, g_RA, g_RS, n):
 	
 	# Rotate left immediate
@@ -526,6 +590,9 @@ def rotlwi(ea, g_mnem, g_RA, g_RS, n):
 	g_SH = n
 	g_MB = 0
 	g_ME = 31
+	
+	if(rotxwi_andnot(ea, g_mnem, g_RA, g_RS, n) == 1):
+		return 1
 
 	return iRotate_iMask32(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
@@ -539,6 +606,9 @@ def rotrwi(ea, g_mnem, g_RA, g_RS, n):
 	g_MB = 0
 	g_ME = 31
 
+	if(rotxwi_andnot(ea, g_mnem, g_RA, g_RS, n) == 1):
+		return 1
+		
 	return iRotate_iMask32(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
 
@@ -831,9 +901,9 @@ def run_task(start_addr, end_addr, always_insert_comment):
 	addr = start_addr
 	while(addr < end_addr):
 		print_str = PPCAsm2C(addr)
-		if(print_str != 0):
+		if(print_str != 0 and print_str != 1):
 			set_cmt(addr, print_str, False)
-		elif (always_insert_comment == True):
+		elif (print_str == 0 and always_insert_comment == True):
 			msg("0x{:X}: Error converting PPC to C code\n".format(addr))
 		addr += 4
 

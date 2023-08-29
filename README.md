@@ -10,6 +10,7 @@ Changes
 - Added clrrdi, clrlsldi, extldi, sldi, srdi, rotldi, rotrdi.
 - Shifts print mask again.
 - Removed BC opcodes, ida handle them fine nowdays.
+- New option to detect rlwinm and rotxwi pair that can be "and not" (enabled by default).
 - More minor changes here and there.
 
  To scan single opcode push F10.
@@ -27,3 +28,14 @@ Examples
     rldicl    r10, r7, 2,56   # r10 = ((r7 << 2) | (r7 >> 62)) & 0xFF
     rlwinm    r0, r0, 0,16,27 # r0 = r0 & 0xFFF0
     sldi      r7, r29, 3      # r7 = (r29 << 3) & 0xFFFFFFFFFFFFFFF8
+    
+	RESOLVE_ANDNOT = 0 output:
+	0xE8DC4  rlwinm  r0, r0, 2,1,31  # r0 = ((r0 << 2) | (r0 >> 30)) & 0x7FFFFFFF
+    0xE8DC8  rotrwi  r0, r0, 2       # r0 = (r0 << 30) | (r0 >> 2)
+
+	RESOLVE_ANDNOT = 1 output:
+    0xE8DC4  rlwinm  r0, r0, 2,1,31  # AND NOT when paired with rotrwi at 0xE8DC8
+    0xE8DC8  rotrwi  r0, r0, 2       # r0 = r0 & ~0x20000000 (r0 from 0xE8DC4)
+	
+	Warning! RESOLVE_ANDNOT option edit comment for both 0xE8DC4 and 0xE8DC8.
+	Regardless on which opcode of those 2 pypyc2c was used.
