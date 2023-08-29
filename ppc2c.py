@@ -503,7 +503,7 @@ def insrdi(ea, g_mnem, g_RA, g_RS, n, b):
 
 def rlwinm_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 
-	if (RESOLVE_ANDNOT == 0):
+	if (RESOLVE_ANDNOT == 0 or g_ME != 31 or g_SH == 0):
 		return 0
 
 	mask = GenerateMask32(g_MB, g_ME)
@@ -549,12 +549,9 @@ def rlwinm(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 	# Rotate Left Word Immediate Then AND with Mask
 	# rlwinm RA, RS, SH, MB, ME
 	
-	# Special case for rlwinm + rotxwi pairs.
-	if(g_ME == 31 and g_SH != 0 and RESOLVE_ANDNOT):
-		if (rlwinm_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME) == 1):
-			return 1
+	if (rlwinm_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME) == 1):
+		return 1
 
-	# Default handling.
 	return iRotate_iMask32(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
 
@@ -575,13 +572,9 @@ def rotxwi_andnot(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2):
 	rlwea = ea - 4
 	while(rlwea > ea - 0x20):
 	
-		# Remove record bit if exist
-		is_rlwinm = print_insn_mnem(rlwea)[:6]
-		
-		if(is_rlwinm == "rlwinm"):
-			g_opnd_t0 = print_operand(rlwea, 0)
-			if(g_opnd_t0 == g_opnd_s1):
-				return PPCAsm2C(rlwea)
+		# Remove record bit if exist, and check for matching opcode
+		if(print_insn_mnem(rlwea)[:6] == "rlwinm" and print_operand(rlwea, 0) == g_opnd_s1):
+			return PPCAsm2C(rlwea)
 
 		rlwea -= 4
 		
