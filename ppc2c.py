@@ -520,9 +520,18 @@ def rlwinm_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 		if(is_rotxwi == "rotlwi" or is_rotxwi == "rotrwi"):
 			g_opnd_t0 = print_operand(rotea, 0)
 			g_opnd_t1 = print_operand(rotea, 1)
+			g_opnd_t2 = int(print_operand(rotea, 2))
+
+			# Check if rotate is using result from rlwinm
+			if(g_opnd_t1 == g_RA):
 			
-			# check if rotate is using result from rlwinm
-			if (g_opnd_t1 == g_RA):
+				# Check if "counter rotate" is exatcly the same as rotate in rlwinm.
+				# This ensure compiler was trying to do "and not".
+				if(is_rotxwi == "rotlwi" and g_opnd_t2 != 32-g_SH):
+					return 0
+				elif(is_rotxwi == "rotrwi" and g_opnd_t2 != g_SH):
+					return 0
+					
 				rlwinm_comment = "AND NOT when paired with " + is_rotxwi + " at 0x{:X}".format(rotea)
 				rotxwi_comment = g_opnd_t0 + " = " + g_RS + " & ~0x{:X} (".format(mask) + g_RS + " from 0x{:X})".format(ea)
 				set_cmt(rotea, rotxwi_comment, 0)
@@ -540,12 +549,12 @@ def rlwinm(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 	# Rotate Left Word Immediate Then AND with Mask
 	# rlwinm RA, RS, SH, MB, ME
 	
-	# Special case for rlwinm + rotxwi pairs
+	# Special case for rlwinm + rotxwi pairs.
 	if(g_ME == 31 and g_SH != 0 and RESOLVE_ANDNOT):
 		if (rlwinm_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME) == 1):
 			return 1
 
-	# Default handling
+	# Default handling.
 	return iRotate_iMask32(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
 
@@ -571,9 +580,6 @@ def rotxwi_andnot(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2):
 		
 		if(is_rlwinm == "rlwinm"):
 			g_opnd_t0 = print_operand(rlwea, 0)
-			g_opnd_t1 = print_operand(rlwea, 1)
-			g_opnd_t2 = print_operand(rlwea, 2)
-			
 			if(g_opnd_t0 == g_opnd_s1):
 				return PPCAsm2C(rlwea)
 
