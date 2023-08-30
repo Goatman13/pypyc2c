@@ -507,8 +507,8 @@ def rlwinm_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 		return 0
 
 	mask = GenerateMask32(g_MB, g_ME)
-	mask = ((mask >> g_SH) | (mask << (32-g_SH))) & 0xFFFFFFFF
-	mask = ~mask & 0xFFFFFFFF
+	mask = ((mask >> g_SH) | (mask << (32-g_SH))) & MASK32_ALLSET
+	mask = ~mask & MASK32_ALLSET
 
 	# Find matching rotxwi
 	rotea = ea + 4
@@ -516,6 +516,12 @@ def rlwinm_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 
 		# Remove record bit if exist
 		is_rotxwi = print_insn_mnem(rotea)[:6]
+		
+		# If rlwinm RA is modified earlier, we need to break and handle it old way.
+		# This helps eliminate false detection when there is not paired rotxwi.
+		if(print_operand(rotea, 0) == g_RA and is_rotxwi != "rotlwi" and is_rotxwi != "rotrwi"):
+				print("Rare case!")
+				return 0
 		
 		if(is_rotxwi == "rotlwi" or is_rotxwi == "rotrwi"):
 			g_opnd_t0 = print_operand(rotea, 0)
@@ -532,7 +538,7 @@ def rlwinm_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 				elif(is_rotxwi == "rotrwi" and g_opnd_t2 != g_SH):
 					return 0
 					
-				rlwinm_comment = "AND NOT when paired with " + is_rotxwi + " at 0x{:X}".format(rotea)
+				rlwinm_comment = "Paired with " + is_rotxwi + " at 0x{:X}".format(rotea)
 				rotxwi_comment = g_opnd_t0 + " = " + g_RS + " & ~0x{:X} (".format(mask) + g_RS + " from 0x{:X})".format(ea)
 				set_cmt(rotea, rotxwi_comment, 0)
 				set_cmt(ea   , rlwinm_comment, 0)
@@ -611,6 +617,24 @@ def rotrwi(ea, g_mnem, g_RA, g_RS, n):
 	return iRotate_iMask32(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
 
+def rotxdi_andnot(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2):
+	
+	if (RESOLVE_ANDNOT == 0):
+		return 0
+
+	# Find matching rldicl
+	rlwea = ea - 4
+	while(rlwea > ea - 0x20):
+	
+		# Remove record bit if exist, and check for matching opcode
+		if(print_insn_mnem(rlwea)[:6] == "rldicl" and print_operand(rlwea, 0) == g_opnd_s1):
+			return PPCAsm2C(rlwea)
+
+		rlwea -= 4
+		
+	return 0
+
+
 def rotldi(ea, g_mnem, g_RA, g_RS, n):
 	
 	# Rotate left immediate
@@ -619,6 +643,9 @@ def rotldi(ea, g_mnem, g_RA, g_RS, n):
 	g_SH = n
 	g_MB = 0
 	g_ME = 63
+
+	if(rotxdi_andnot(ea, g_mnem, g_RA, g_RS, n) == 1):
+		return 1
 
 	return iRotate_iMask64(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
@@ -631,6 +658,9 @@ def rotrdi(ea, g_mnem, g_RA, g_RS, n):
 	g_SH = 64-n
 	g_MB = 0
 	g_ME = 63
+
+	if(rotxdi_andnot(ea, g_mnem, g_RA, g_RS, n) == 1):
+		return 1
 
 	return iRotate_iMask64(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
@@ -713,12 +743,67 @@ def rldic(ea, g_mnem, g_RA, g_RS, g_SH, g_MB):
 
 	return iRotate_iMask64(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
+def rldicl_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
+
+	if (RESOLVE_ANDNOT == 0 or g_ME != 63 or g_SH == 0):
+		return 0
+
+	mask = GenerateMask64(g_MB, g_ME)
+	mask = ((mask >> g_SH) | (mask << (64-g_SH))) & MASK64_ALLSET
+	mask = ~mask & MASK64_ALLSET
+	upper_mask = mask >> 32
+	lower_mask = mask & MASK32_ALLSET
+
+	# Find matching rotxwi
+	rotea = ea + 4
+	while(rotea < ea + 0x20):
+
+		# Remove record bit if exist
+		is_rotxdi = print_insn_mnem(rotea)[:6]
+		
+		# If rldicl RA is modified earlier, we need to break and handle it old way.
+		# This helps eliminate false detection when there is not paired rotxdi.
+		if(print_operand(rotea, 0) == g_RA and is_rotxdi != "rotldi" and is_rotxdi != "rotrdi"):
+			print("Rare case! " + is_rotxdi + " " + print_operand(rotea, 0))
+			return 0
+		
+		if(is_rotxdi == "rotldi" or is_rotxdi == "rotrdi"):
+			g_opnd_t0 = print_operand(rotea, 0)
+			g_opnd_t1 = print_operand(rotea, 1)
+			g_opnd_t2 = int(print_operand(rotea, 2))
+
+			# Check if rotate is using result from rlwinm
+			if(g_opnd_t1 == g_RA):
+			
+				# Check if "counter rotate" is exatcly the same as rotate in rlwinm.
+				# This ensure compiler was trying to do "and not".
+				if(is_rotxdi == "rotldi" and g_opnd_t2 != 64-g_SH):
+					return 0
+				elif(is_rotxdi == "rotrdi" and g_opnd_t2 != g_SH):
+					return 0
+					
+				rldicl_comment = "Paired with " + is_rotxdi + " at 0x{:X}".format(rotea)
+				if(upper_mask != 0):
+					rotxdi_comment = g_opnd_t0 + " = " + g_RS + " & ~0x{:X}_{:08X} (".format(upper_mask, lower_mask) + g_RS + " from 0x{:X})".format(ea)
+				else:
+					rotxdi_comment = g_opnd_t0 + " = " + g_RS + " & ~0x{:X} (".format(lower_mask) + g_RS + " from 0x{:X})".format(ea)					
+				set_cmt(rotea, rotxdi_comment, 0)
+				set_cmt(ea   , rldicl_comment, 0)
+				return 1
+
+		rotea += 4
+	
+	# rotxwi not found, fallback to default handling.
+	return 0
 
 def rldicl(ea, g_mnem, g_RA, g_RS, g_SH, g_MB):
 	
 	# Rotate Left Double Word Immediate then Clear Left
 	# rldicl RA, RS, SH, MB
 	g_ME = 63
+	
+	if (rldicl_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME) == 1):
+		return 1
 
 	return iRotate_iMask64(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 

@@ -11,6 +11,7 @@ Changes
 - Shifts print mask again.
 - Removed BC opcodes, ida handle them fine nowdays.
 - New option to detect rlwinm and rotxwi pair that can be "and not" (enabled by default).
+- New option to detect rldicl and rotxdi pair that can be "and not" (enabled by default).
 - More minor changes here and there.
 
  To scan single opcode push F10.
@@ -34,7 +35,7 @@ Examples
     0xE8DC8  rotrwi  r0, r0, 2       # r0 = (r0 << 30) | (r0 >> 2)
 
 	RESOLVE_ANDNOT = 1 output:
-    0xE8DC4  rlwinm  r0, r0, 2,1,31  # AND NOT when paired with rotrwi at 0xE8DC8
+    0xE8DC4  rlwinm  r0, r0, 2,1,31  # Paired with rotrwi at 0xE8DC8
     0xE8DC8  rotrwi  r0, r0, 2       # r0 = r0 & ~0x20000000 (r0 from 0xE8DC4)
 	
 	Warning! RESOLVE_ANDNOT option edit comment for both 0xE8DC4 and 0xE8DC8.
