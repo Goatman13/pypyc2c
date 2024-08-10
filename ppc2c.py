@@ -6,6 +6,7 @@
 from ida_bytes import *
 from idaapi import *
 from idc import *
+import ida_ida
 import idaapi
 import ida_bytes
 import idc
@@ -750,10 +751,11 @@ def rldicl_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 
 	mask = GenerateMask64(g_MB, g_ME)
 	mask = ((mask >> g_SH) | (mask << (64-g_SH))) & MASK64_ALLSET
+	maska = mask
 	mask = ~mask & MASK64_ALLSET
 	upper_mask = mask >> 32
 	lower_mask = mask & MASK32_ALLSET
-
+	
 	# Find matching rotxwi
 	rotea = ea + 4
 	while(rotea < ea + 0x20):
@@ -763,30 +765,54 @@ def rldicl_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 		
 		# If rldicl RA is modified earlier, we need to break and handle it old way.
 		# This helps eliminate false detection when there is not paired rotxdi.
-		if(print_operand(rotea, 0) == g_RA and is_rotxdi != "rotldi" and is_rotxdi != "rotrdi"):
+		if(print_operand(rotea, 0) == g_RA and is_rotxdi not in ["rotldi", "rotrdi", "rldicl"]):
 			print("Rare case! " + is_rotxdi + " " + print_operand(rotea, 0))
 			return 0
 		
-		if(is_rotxdi == "rotldi" or is_rotxdi == "rotrdi"):
+		#if(is_rotxdi == "rotldi" or is_rotxdi == "rotrdi" or is_rotxdi == "rldicl"):
+		if(is_rotxdi in ["rotldi", "rotrdi", "rldicl"]):
 			g_opnd_t0 = print_operand(rotea, 0)
 			g_opnd_t1 = print_operand(rotea, 1)
-			g_opnd_t2 = int(print_operand(rotea, 2))
+			g_opnd_t2 = print_operand(rotea, 2)
+			if(is_rotxdi == "rldicl"):
+				comma1 = ","
+				comma1 = g_opnd_t2.find(comma1)
+				if(comma1 != -1):
+					g_opnd_t3 = g_opnd_t2[comma1+1:]
+					g_opnd_t2 = g_opnd_t2[0:comma1]
+					g_opnd_t2 = int(g_opnd_t2)
+					g_opnd_t3 = int(g_opnd_t3)
+			else:
+				g_opnd_t2 = int(g_opnd_t2)
 
-			# Check if rotate is using result from rlwinm
+
+			# Check if rotate is using result from rldicl
 			if(g_opnd_t1 == g_RA):
 			
-				# Check if "counter rotate" is exatcly the same as rotate in rlwinm.
+				# Check if "counter rotate" is exatcly the same as rotate in rldicl.
 				# This ensure compiler was trying to do "and not".
-				if(is_rotxdi == "rotldi" and g_opnd_t2 != 64-g_SH):
+				if(is_rotxdi in ["rotldi", "rldicl"] and g_opnd_t2 != 64-g_SH):
 					return 0
 				elif(is_rotxdi == "rotrdi" and g_opnd_t2 != g_SH):
 					return 0
-					
+
+				tilde = "~"
+				if(is_rotxdi == "rldicl"):
+					new_mask = GenerateMask64(g_opnd_t3, 63)
+					new_mask = ~new_mask & MASK64_ALLSET
+					new_upper_mask = new_mask >> 32
+					new_lower_mask = new_mask & MASK32_ALLSET
+					upper_mask = new_upper_mask | upper_mask
+					lower_mask = new_lower_mask | lower_mask
+					upper_mask = ~upper_mask & MASK32_ALLSET
+					lower_mask = ~lower_mask & MASK32_ALLSET
+					tilde = ""
+
 				rldicl_comment = "Paired with " + is_rotxdi + " at 0x{:X}".format(rotea)
 				if(upper_mask != 0):
-					rotxdi_comment = g_opnd_t0 + " = " + g_RS + " & ~0x{:X}_{:08X} (".format(upper_mask, lower_mask) + g_RS + " from 0x{:X})".format(ea)
+					rotxdi_comment = g_opnd_t0 + " = " + g_RS + " & " + tilde + "0x{:X}_{:08X} (".format(upper_mask, lower_mask) + g_RS + " from 0x{:X})".format(ea)
 				else:
-					rotxdi_comment = g_opnd_t0 + " = " + g_RS + " & ~0x{:X} (".format(lower_mask) + g_RS + " from 0x{:X})".format(ea)					
+					rotxdi_comment = g_opnd_t0 + " = " + g_RS + " & " + tilde + "0x{:X} (".format(lower_mask) + g_RS + " from 0x{:X})".format(ea)					
 				set_cmt(rotea, rotxdi_comment, 0)
 				set_cmt(ea   , rldicl_comment, 0)
 				return 1
@@ -796,6 +822,7 @@ def rldicl_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 	# rotxwi not found, fallback to default handling.
 	return 0
 
+
 def rldicl(ea, g_mnem, g_RA, g_RS, g_SH, g_MB):
 	
 	# Rotate Left Double Word Immediate then Clear Left
@@ -804,7 +831,10 @@ def rldicl(ea, g_mnem, g_RA, g_RS, g_SH, g_MB):
 	
 	if (rldicl_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME) == 1):
 		return 1
-
+	
+	if(rotxdi_andnot(ea, g_mnem, g_RA, g_RS, g_SH) == 1):
+		return 1
+	
 	return iRotate_iMask64(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
 
@@ -833,6 +863,86 @@ def rlwimi(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 
 	return insert_iRotate_iMask32(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
+def mfocrf(ea, g_mnem, g_RT, g_FXM):
+	
+	# Move from One Condition Register Field
+	# mfocrf RT, FXM
+
+	#FXM is passed as str
+	g_FXM  = int(g_FXM, 16)
+	if ida_ida.inf_get_procname() != "ppcl":
+		string = ".\nLower 32 bits of " + g_RT + " = \n" 
+		if g_FXM & 0x80 != 0:
+			string += " cr0 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x40 != 0:
+			string += " cr1 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x20 != 0:
+			string += " cr2 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x10 != 0:
+			string += " cr3 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x08 != 0:
+			string += " cr4 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x04 != 0:
+			string += " cr5 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x02 != 0:
+			string += " cr6 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x01 != 0:
+			string += " cr7"
+		else:
+			string += "0000"
+		string += "\n 0-3 |  4-7 | 8-11 | 12-15| 16-19| 20-23| 24-27| 28-31"
+	else:
+		string = ".\nLower 32 bits of " + g_RT + " = \n" 
+		if g_FXM & 0x01 != 0:
+			string += " cr7 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x02 != 0:
+			string += " cr6 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x04 != 0:
+			string += " cr5 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x08 != 0:
+			string += " cr4 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x10 != 0:
+			string += " cr3 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x20 != 0:
+			string += " cr2 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x40 != 0:
+			string += " cr1 | "
+		else:
+			string += "0000 | "
+		if g_FXM & 0x80 != 0:
+			string += " cr0"
+		else:
+			string += "0000"
+		string += "\n31-28| 27-24| 23-20| 19-16| 15-12| 11-8 | 7-4 | 3-0"
+	string += "\nFor single field:\nbit0 = LT, bit1 = GT, bit2 = EQ, bit3 = SO"
+	return string
+
 
 # try to do as much work in this function as possible in order to
 # simplify each "instruction" handling function
@@ -860,7 +970,7 @@ def PPCAsm2C(ea):
 	accepted = ["clrlwi", "clrldi", "clrrwi", "clrrdi", "clrlslwi", "clrlsldi",
 				"extlwi", "extldi", "extrwi", "extrdi", "inslwi", "insrwi", "insrdi",
 				"rlwinm", "rlwnm", "rotlw", "rotlwi", "rotrwi", "rotldi", "rotrdi", "slwi", "srwi", "sldi",
-				"srdi", "rldcr", "rldic", "rldicl", "rldicr", "rldimi", "rlwimi"]
+				"srdi", "rldcr", "rldic", "rldicl", "rldicr", "rldimi", "rlwimi", "mfocrf"]
 	for x in accepted:
 		if (g_mnem == x):
 			is_ok = True
@@ -895,7 +1005,7 @@ def PPCAsm2C(ea):
 		g_opnd_s3 = int(g_opnd_s3)
 	
 	# convert s2 to int, except when s2 is reg nr.
-	if (g_mnem != "rldcr" and g_mnem != "rotlw" and g_mnem != "rlwnm"):
+	if (g_mnem != "rldcr" and g_mnem != "rotlw" and g_mnem != "rlwnm" and g_mnem != "mfocrf"):
 		g_opnd_s2 = int(g_opnd_s2)
 	
 	# below is a list of supported instructions
@@ -975,7 +1085,10 @@ def PPCAsm2C(ea):
 		return sldi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
 	elif(g_mnem == "srdi"):
 		return srdi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
-		
+
+	#misc
+	elif(g_mnem == "mfocrf"):
+		return mfocrf(ea, g_mnem, g_opnd_s0, g_opnd_s1)
 	return 0
 
 
@@ -1010,7 +1123,7 @@ def PluginMainF():
 	
 	# convert current function
 	p_func = get_func(get_screen_ea());
-	if(p_func == None):
+	if(type(p_func) == type(None)):
 		msg("Not in a function, so can't do PPC to C conversion for the current function!\n");
 		return;
 	start_addr = p_func.start_ea;
