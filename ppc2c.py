@@ -871,78 +871,45 @@ def mfocrf(ea, g_mnem, g_RT, g_FXM):
 	#FXM is passed as str
 	g_FXM  = int(g_FXM, 16)
 	if ida_ida.inf_get_procname() != "ppcl":
-		string = ".\nLower 32 bits of " + g_RT + " = \n" 
-		if g_FXM & 0x80 != 0:
-			string += " cr0 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x40 != 0:
-			string += " cr1 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x20 != 0:
-			string += " cr2 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x10 != 0:
-			string += " cr3 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x08 != 0:
-			string += " cr4 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x04 != 0:
-			string += " cr5 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x02 != 0:
-			string += " cr6 | "
-		else:
-			string += "0000 | "
 		if g_FXM & 0x01 != 0:
-			string += " cr7"
+			string = " = cr7 & 0x0000000F\nbit28 = LT, bit29 = GT, bit30 = EQ, bit31 = SO"
+		elif g_FXM & 0x02 != 0:
+			string = " = (cr6 << 4) & 0x000000F0\nbit24 = LT, bit25 = GT, bit26 = EQ, bit27 = SO"
+		elif g_FXM & 0x04 != 0:
+			string = " = (cr5 << 8) & 0x00000F00\nbit20 = LT, bit21 = GT, bit22 = EQ, bit23 = SO"
+		elif g_FXM & 0x08 != 0:
+			string = " = (cr4 << 12) & 0x0000F000\nbit16 = LT, bit17 = GT, bit18 = EQ, bit19 = SO"
+		elif g_FXM & 0x10 != 0:
+			string = " = (cr3 << 16) & 0x000F0000\nbit12 = LT, bit13 = GT, bit14 = EQ, bit15 = SO"
+		elif g_FXM & 0x20 != 0:
+			string = " = (cr2 << 20) & 0x00F00000\nbit8 = LT, bit9 = GT, bit10 = EQ, bit11 = SO"
+		elif g_FXM & 0x40 != 0:
+			string = " = (cr1 << 24) & 0x0F000000\nbit4 = LT, bit5 = GT, bit6 = EQ, bit7 = SO"
+		elif g_FXM & 0x80 != 0:
+			string = " = (cr0 << 28) & 0xF0000000\nbit0 = LT, bit1 = GT, bit2 = EQ, bit3 = SO"
 		else:
-			string += "0000"
-		string += "\n 0-3 |  4-7 | 8-11 | 12-15| 16-19| 20-23| 24-27| 28-31"
-	else:
-		string = ".\nLower 32 bits of " + g_RT + " = \n" 
-		if g_FXM & 0x01 != 0:
-			string += " cr7 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x02 != 0:
-			string += " cr6 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x04 != 0:
-			string += " cr5 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x08 != 0:
-			string += " cr4 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x10 != 0:
-			string += " cr3 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x20 != 0:
-			string += " cr2 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x40 != 0:
-			string += " cr1 | "
-		else:
-			string += "0000 | "
-		if g_FXM & 0x80 != 0:
-			string += " cr0"
-		else:
-			string += "0000"
-		string += "\n31-28| 27-24| 23-20| 19-16| 15-12| 11-8 | 7-4 | 3-0"
-	string += "\nFor single field:\nbit0 = LT, bit1 = GT, bit2 = EQ, bit3 = SO"
-	return string
-
+			return 0
+	return ".\n" + g_RT + string
+	
+	#LE new impl
+	#if g_FXM & 0x01 != 0:
+	#	string = " = (cr7 << 28) & 0xF0000000\nbit0 = LT, bit1 = GT, bit2 = EQ, bit3 = SO"
+	#elif g_FXM & 0x02 != 0:
+	#	string = " = (cr6 << 24) & 0x0F000000\nbit4 = LT, bit5 = GT, bit6 = EQ, bit7 = SO"
+	#elif g_FXM & 0x04 != 0:
+	#	string = " = (cr5 << 20) & 0x00F00000\nbit8 = LT, bit9 = GT, bit10 = EQ, bit11 = SO"
+	#elif g_FXM & 0x08 != 0:
+	#	string = " = (cr4 << 16) & 0x000F0000\nbit12 = LT, bit13 = GT, bit14 = EQ, bit15 = SO"
+	#elif g_FXM & 0x10 != 0:
+	#	string = " = (cr3 << 12) & 0x0000F000\nbit16 = LT, bit17 = GT, bit18 = EQ, bit19 = SO"
+	#elif g_FXM & 0x20 != 0:
+	#	string = " = (cr2 << 8) & 0x00000F00\nbit20 = LT, bit21 = GT, bit22 = EQ, bit23 = SO"
+	#elif g_FXM & 0x40 != 0:
+	#	string = " = (cr1 << 4) & 0x000000F0\nbit24 = LT, bit25 = GT, bit26 = EQ, bit27 = SO"
+	#elif g_FXM & 0x80 != 0:
+	#	string = " = cr0 & 0x0000000F\nbit28 = LT, bit29 = GT, bit30 = EQ, bit31 = SO"
+	#else:
+	#	return 0
 
 # try to do as much work in this function as possible in order to
 # simplify each "instruction" handling function
