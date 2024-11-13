@@ -454,6 +454,23 @@ def extlwi(ea, g_mnem, g_RA, g_RS, n, b):
 	return iRotate_iMask32(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
 
+def extldi_sldi_and(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2):
+	
+	if (RESOLVE_ANDNOT == 0):
+		return 0
+
+	# Find matching sldi
+	sldiea = ea - 4
+	while(sldiea > ea - 0x20):
+	
+		# Remove record bit if exist, and check for matching opcode
+		if(print_insn_mnem(sldiea)[:6] == "sldi" and print_operand(sldiea, 0) == g_opnd_s1):
+			return PPCAsm2C(sldiea)
+
+		sldiea -= 4
+		
+	return 0
+
 def extldi(ea, g_mnem, g_RA, g_RS, n, b):
 	
 	# Extract double word and left justify immediate
@@ -462,6 +479,9 @@ def extldi(ea, g_mnem, g_RA, g_RS, n, b):
 	g_SH = b
 	g_MB = 0
 	g_ME = n-1
+
+	if(extldi_sldi_and(ea, g_mnem, g_RA, g_RS, n) == 1):
+		return 1
 
 	return iRotate_iMask64(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
@@ -700,6 +720,64 @@ def srwi(ea, g_mnem, g_RA, g_RS, n):
 
 	return iRotate_iMask32(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
+def sldi_and(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
+
+	if (RESOLVE_ANDNOT == 0 or g_SH == 0):
+		return 0
+
+	mask = GenerateMask64(g_MB, g_ME)
+	mask = ((mask >> g_SH) | (mask << (64-g_SH))) & MASK64_ALLSET
+	
+	# Find matching extldi
+	extldiea = ea + 4
+	while(extldiea < ea + 0x20):
+
+		# Remove record bit if exist
+		is_extldi = print_insn_mnem(extldiea)[:6]
+		
+		# If extldi RA is modified earlier, we need to break and handle it old way.
+		# This helps eliminate false detection when there is not paired extldi.
+		if(print_operand(extldiea, 0) == g_RA and is_extldi != "extldi"):
+			print("Rare case! " + is_extldi + " " + print_operand(extldiea, 0))
+			return 0
+		
+		if(is_extldi  == "extldi"):
+			g_opnd_t0 = print_operand(extldiea, 0)
+			g_opnd_t1 = print_operand(extldiea, 1)
+			g_opnd_t2 = print_operand(extldiea, 2)
+			comma1 = ","
+			comma1 = g_opnd_t2.find(comma1)
+			g_opnd_t3 = g_opnd_t2[comma1+1:]
+			g_opnd_t2 = g_opnd_t2[0:comma1]
+			g_opnd_t2 = int(g_opnd_t2)
+			g_opnd_t3 = int(g_opnd_t3)
+
+
+			# Check if rotate is using result from rldicl
+			if(g_opnd_t1 == g_RA):
+			
+				# Check if "counter rotate" is exatcly the same as rotate in rldicl.
+				# This ensure compiler was trying to clear upper bits.
+				if(g_opnd_t3 + g_SH != 64):
+					return 0
+
+				new_mask = GenerateMask64(0, g_opnd_t2-1)
+				mask = mask & new_mask
+				upper_mask = mask >> 32
+				lower_mask = mask & MASK32_ALLSET
+				sldi_comment = "Paired with " + is_extldi + " at 0x{:X}".format(extldiea)
+				if(upper_mask != 0):
+					extldi_comment = g_opnd_t0 + " = " + g_RS + " & " + "0x{:08X}_{:08X} (".format(upper_mask, lower_mask) + g_RS + " from 0x{:X})".format(ea)
+				else:
+					extldi_comment = g_opnd_t0 + " = " + g_RS + " & " + "0x{:X} (".format(lower_mask) + g_RS + " from 0x{:X})".format(ea)					
+				set_cmt(extldiea, extldi_comment, 0)
+				set_cmt(ea   , sldi_comment, 0)
+				return 1
+
+		extldiea += 4
+	
+	# extldi not found, fallback to default handling.
+	return 0
 
 def sldi(ea, g_mnem, g_RA, g_RS, n):
 	
@@ -709,6 +787,9 @@ def sldi(ea, g_mnem, g_RA, g_RS, n):
 	g_SH = n
 	g_MB = 0
 	g_ME = 63-n
+
+	if (sldi_and(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME) == 1):
+		return 1
 
 	return iRotate_iMask64(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME)
 
@@ -911,6 +992,18 @@ def mfocrf(ea, g_mnem, g_RT, g_FXM):
 	#else:
 	#	return 0
 
+def mfcr(ea, g_mnem, g_RT):
+
+	string = ".\n"
+	string += "cr7 bit28 = LT, bit29 = GT, bit30 = EQ, bit31 = SO\n"
+	string += "cr6 bit24 = LT, bit25 = GT, bit26 = EQ, bit27 = SO\n"
+	string += "cr5 bit20 = LT, bit21 = GT, bit22 = EQ, bit23 = SO\n"
+	string += "cr4 bit16 = LT, bit17 = GT, bit18 = EQ, bit19 = SO\n"
+	string += "cr3 bit12 = LT, bit13 = GT, bit14 = EQ, bit15 = SO\n"
+	string += "cr2 bit8  = LT, bit9  = GT, bit10 = EQ, bit11 = SO\n"
+	string += "cr1 bit4  = LT, bit5  = GT, bit6  = EQ, bit7  = SO\n"
+	string += "cr0 bit0  = LT, bit1  = GT, bit2  = EQ, bit3  = SO\n"
+	return string
 # try to do as much work in this function as possible in order to
 # simplify each "instruction" handling function
 def PPCAsm2C(ea):
@@ -937,7 +1030,7 @@ def PPCAsm2C(ea):
 	accepted = ["clrlwi", "clrldi", "clrrwi", "clrrdi", "clrlslwi", "clrlsldi",
 				"extlwi", "extldi", "extrwi", "extrdi", "inslwi", "insrwi", "insrdi",
 				"rlwinm", "rlwnm", "rotlw", "rotlwi", "rotrwi", "rotldi", "rotrdi", "slwi", "srwi", "sldi",
-				"srdi", "rldcr", "rldic", "rldicl", "rldicr", "rldimi", "rlwimi", "mfocrf"]
+				"srdi", "rldcr", "rldic", "rldicl", "rldicr", "rldimi", "rlwimi", "mfocrf", "mfcr"]
 	for x in accepted:
 		if (g_mnem == x):
 			is_ok = True
@@ -972,7 +1065,7 @@ def PPCAsm2C(ea):
 		g_opnd_s3 = int(g_opnd_s3)
 	
 	# convert s2 to int, except when s2 is reg nr.
-	if (g_mnem != "rldcr" and g_mnem != "rotlw" and g_mnem != "rlwnm" and g_mnem != "mfocrf"):
+	if (g_mnem != "rldcr" and g_mnem != "rotlw" and g_mnem != "rlwnm" and g_mnem != "mfocrf" and g_mnem != "mfcr"):
 		g_opnd_s2 = int(g_opnd_s2)
 	
 	# below is a list of supported instructions
@@ -1056,6 +1149,8 @@ def PPCAsm2C(ea):
 	#misc
 	elif(g_mnem == "mfocrf"):
 		return mfocrf(ea, g_mnem, g_opnd_s0, g_opnd_s1)
+	elif(g_mnem == "mfcr"):
+		return mfcr(ea, g_mnem, g_opnd_s0)
 	return 0
 
 
