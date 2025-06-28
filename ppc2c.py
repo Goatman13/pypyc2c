@@ -519,6 +519,13 @@ def rlwinm_andnot(ea, g_mnem, g_RA, g_RS, g_SH, g_MB, g_ME):
 	# rotxwi not found, fallback to default handling.
 	return 0
 
+def get_my_cr_string(cr):
+	
+	if cr[0:2] == "4*":
+		return cr[2:5] + ":" + cr[6:8]
+	else:
+		return "cr0:" + cr
+
 
 # ==================================================================
 #
@@ -962,6 +969,80 @@ def mfcr(ea, g_mnem, g_RT):
 	string += "cr1 bit4  = LT, bit5  = GT, bit6  = EQ, bit7  = SO\n"
 	string += "cr0 bit0  = LT, bit1  = GT, bit2  = EQ, bit3  = SO\n"
 	return string
+	
+def crnor(ea, g_mnem, g_BD, g_BA, g_BB):
+	
+	# Condition Register NOR
+
+	return g_BD + " = ~(" + g_BA + " | " + g_BB + ")"
+
+def crnot(ea, g_mnem, g_BD, g_BA):
+	
+	# Condition Register NOT
+
+	return g_BD + " = ~" + g_BA
+
+def crandc(ea, g_mnem, g_BD, g_BA, g_BB):
+	
+	# Condition Register ANDC
+
+	return g_BD + " = " + g_BA + " & ~" + g_BB
+
+def crxor(ea, g_mnem, g_BD, g_BA, g_BB):
+	
+	# Condition Register XOR
+
+	return g_BD + " = " + g_BA + " ^ " + g_BB
+
+def crclr(ea, g_mnem, g_BD, g_BA, g_BB):
+	
+	# Condition Register CLEAR
+
+	return g_BD + " = 0"
+
+def crnand(ea, g_mnem, g_BD, g_BA, g_BB):
+	
+	# Condition Register NAND
+
+	return g_BD + " = ~(" + g_BA + " & " + g_BB + ")"
+
+def crand(ea, g_mnem, g_BD, g_BA, g_BB):
+	
+	# Condition Register AND
+
+	return g_BD + " = " + g_BA + " & " + g_BB
+	
+def creqv(ea, g_mnem, g_BD, g_BA, g_BB):
+	
+	# Condition Register Equivalent
+
+	return g_BD + " = ~(" + g_BA + " ^ " + g_BB + ")"
+	
+def crset(ea, g_mnem, g_BD):
+	
+	# Condition Register SET
+
+	return g_BD + " = 1"
+	
+def crorc(ea, g_mnem, g_BD, g_BA, g_BB):
+	
+	# Condition Register ORC
+
+	return g_BD + " = " + g_BA + " | ~" + g_BB
+	
+def cror(ea, g_mnem, g_BD, g_BA, g_BB):
+	
+	# Condition Register OR
+
+	return g_BD + " = " + g_BA + " | " + g_BB
+	
+def crmove(ea, g_mnem, g_BD, g_BA):
+	
+	# Condition Register MOVE
+
+	return g_BD + " = " + g_BA
+	
+	
 # try to do as much work in this function as possible in order to
 # simplify each "instruction" handling function
 def PPCAsm2C(ea):
@@ -988,7 +1069,8 @@ def PPCAsm2C(ea):
 	accepted = ["clrlwi", "clrldi", "clrrwi", "clrrdi", "clrlslwi", "clrlsldi",
 				"extlwi", "extldi", "extrwi", "extrdi", "inslwi", "insrwi", "insrdi",
 				"rlwinm", "rlwnm", "rotlw", "rotlwi", "rotrwi", "rotldi", "rotld", "rotrdi", "slwi", "srwi", "sldi",
-				"srdi", "rldcr", "rldic", "rldicl", "rldicr", "rldimi", "rlwimi", "mfocrf", "mfcr"]
+				"srdi", "rldcr", "rldic", "rldicl", "rldicr", "rldimi", "rlwimi", "mfocrf", "mfcr",
+				"crnor", "crnot", "crandc", "crxor", "crclr", "crnand", "crand", "creqv", "crset", "crorc", "cror", "crmove"]
 	for x in accepted:
 		if (g_mnem == x):
 			is_ok = True
@@ -1023,7 +1105,9 @@ def PPCAsm2C(ea):
 		g_opnd_s3 = int(g_opnd_s3)
 	
 	# convert s2 to int, except when s2 is reg nr.
-	if (g_mnem not in ["rldcr", "rotlw",  "rotld", "rlwnm", "mfocrf", "mfcr"]):
+	if (g_mnem not in ["rldcr", "rotlw",  "rotld", "rlwnm", "mfocrf", "mfcr",
+						"crnor", "crnot", "crandc", "crxor", "crclr", "crnand", 
+						"crand", "creqv", "crset", "crorc", "cror", "crmove"]):
 		g_opnd_s2 = int(g_opnd_s2)
 		
 	# below is a list of supported instructions
@@ -1106,11 +1190,35 @@ def PPCAsm2C(ea):
 	elif(g_mnem == "srdi"):
 		return srdi(ea, g_mnem, g_opnd_s0, g_opnd_s1, g_opnd_s2)
 
-	#misc
+	# cr operations
 	elif(g_mnem == "mfocrf"):
 		return mfocrf(ea, g_mnem, g_opnd_s0, g_opnd_s1)
 	elif(g_mnem == "mfcr"):
 		return mfcr(ea, g_mnem, g_opnd_s0)
+	elif(g_mnem == "crnor"):
+		return crnor(ea, g_mnem, get_my_cr_string(g_opnd_s0), get_my_cr_string(g_opnd_s1), get_my_cr_string(g_opnd_s2))
+	elif(g_mnem == "crnot"):
+		return crnot(ea, g_mnem, get_my_cr_string(g_opnd_s0), get_my_cr_string(g_opnd_s1))
+	elif(g_mnem == "crandc"):
+		return crandc(ea, g_mnem, get_my_cr_string(g_opnd_s0), get_my_cr_string(g_opnd_s1), get_my_cr_string(g_opnd_s2))
+	elif(g_mnem == "crxor"):
+		return crxor(ea, g_mnem, get_my_cr_string(g_opnd_s0), get_my_cr_string(g_opnd_s1), get_my_cr_string(g_opnd_s2))
+	elif(g_mnem == "crclr"):
+		return crclr(ea, g_mnem, get_my_cr_string(g_opnd_s0))
+	elif(g_mnem == "crnand"):
+		return crnand(ea, g_mnem, get_my_cr_string(g_opnd_s0), get_my_cr_string(g_opnd_s1), get_my_cr_string(g_opnd_s2))
+	elif(g_mnem == "crand"):
+		return crand(ea, g_mnem, get_my_cr_string(g_opnd_s0), get_my_cr_string(g_opnd_s1), get_my_cr_string(g_opnd_s2))
+	elif(g_mnem == "creqv"):
+		return creqv(ea, g_mnem, get_my_cr_string(g_opnd_s0), get_my_cr_string(g_opnd_s1), get_my_cr_string(g_opnd_s2))
+	elif(g_mnem == "crset"):
+		return crset(ea, g_mnem, get_my_cr_string(g_opnd_s0))
+	elif(g_mnem == "crorc"):
+		return crorc(ea, g_mnem, get_my_cr_string(g_opnd_s0), get_my_cr_string(g_opnd_s1), get_my_cr_string(g_opnd_s2))
+	elif(g_mnem == "cror"):
+		return cror(ea, g_mnem, get_my_cr_string(g_opnd_s0), get_my_cr_string(g_opnd_s1), get_my_cr_string(g_opnd_s2))
+	elif(g_mnem == "crmove"):
+		return crmove(ea, g_mnem, get_my_cr_string(g_opnd_s0), get_my_cr_string(g_opnd_s1))
 	return 0
 
 
