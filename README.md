@@ -29,6 +29,7 @@ Examples
     rldicl    r10, r7, 2,56   # r10 = ((r7 << 2) | (r7 >> 62)) & 0xFF
     rlwinm    r0, r0, 0,16,27 # r0 = r0 & 0xFFF0
     sldi      r7, r29, 3      # r7 = (r29 << 3) & 0xFFFFFFFFFFFFFFF8
+    crorc     4*cr2+eq, 4*cr2+eq, 4*cr3+gt # cr2:eq = cr2:eq | ~cr3:gt
     
 	SIMPLIFY = 0 output:
     0x66EA4   rlwinm    r9, r0, 29,1,31   # r9 = ((r0 << 29) | (r0 >> 3)) & 0x7FFFFFFF
