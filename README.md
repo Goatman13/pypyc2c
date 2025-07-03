@@ -1,4 +1,4 @@
-# pypyc2c
+# ida_py_ppc2c
 PowerPC to C plugin for IDA converted to python.
 - Modified version of Zak Stanborough's PPC2C plugin released as part of [Hex-Rays Plug-In Contest 2009](https://www.hex-rays.com/contests/2009/).
 
@@ -10,8 +10,8 @@ Changes
 - Added clrrdi, clrlsldi, extldi, sldi, srdi, rotldi, rotrdi.
 - Shifts print mask again.
 - Removed BC opcodes, ida handle them fine nowdays.
-- New option to detect rlwinm and rotxwi pair that can be "and not" (enabled by default).
-- New option to detect rldicl and rotxdi pair that can be "and not" (enabled by default).
+- Added cr manipulation opcodes.
+- New SIMPLIFY option to detect opcode pairs that can be used as advanced "and"/"and not" (enabled by default).
 - More minor changes here and there.
 
  To scan single opcode push F10.
@@ -30,13 +30,13 @@ Examples
     rlwinm    r0, r0, 0,16,27 # r0 = r0 & 0xFFF0
     sldi      r7, r29, 3      # r7 = (r29 << 3) & 0xFFFFFFFFFFFFFFF8
     
-	RESOLVE_ANDNOT = 0 output:
-	0xE8DC4  rlwinm  r0, r0, 2,1,31  # r0 = ((r0 << 2) | (r0 >> 30)) & 0x7FFFFFFF
-    0xE8DC8  rotrwi  r0, r0, 2       # r0 = (r0 << 30) | (r0 >> 2)
+	SIMPLIFY = 0 output:
+    0x66EA4   rlwinm    r9, r0, 29,1,31   # r9 = ((r0 << 29) | (r0 >> 3)) & 0x7FFFFFFF
+    0x66EB4   rotlwi    r9, r9, 3         # r9 = (r9 << 3) | (r9 >> 29)
 
-	RESOLVE_ANDNOT = 1 output:
-    0xE8DC4  rlwinm  r0, r0, 2,1,31  # Paired with rotrwi at 0xE8DC8
-    0xE8DC8  rotrwi  r0, r0, 2       # r0 = r0 & ~0x20000000 (r0 from 0xE8DC4)
+	SIMPLIFY = 1 output:
+    0x66EA4   rlwinm    r9, r0, 29,1,31   # Paired with rotlwi at 0x66EB4
+    0x66EB4   rotlwi    r9, r9, 3         # r9 = r0 & ~0x4 (r0 from 0x66EA4)
 	
-	Warning! RESOLVE_ANDNOT option edit comment for both 0xE8DC4 and 0xE8DC8.
-	Regardless on which opcode of those 2 pypyc2c was used.
+	Warning! SIMPLIFY option edit comment for both locations.
+	Regardless on which opcode of those 2 ida_py_ppc2c was used.
